@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>SansaVRM Studio AI</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+
+    section {
+      margin-bottom: 32px;
+      border: 1px solid #ccc;
+      padding: 12px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    th,
+    td {
+      border: 1px solid #ccc;
+      padding: 4px;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <h1>SansaVRM Studio AI</h1>
+
+  <section>
+    <h2>Project Summary</h2>
+    <pre id="project-summary"></pre>
+  </section>
+
+  <section>
+    <h2>Artifacts</h2>
+    <table id="artifact-table">
+      <thead>
+        <tr>
+          <th>artifact_id</th>
+          <th>artifact_type</th>
+          <th>path</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Workflow Runs</h2>
+    <table id="workflow-table">
+      <thead>
+        <tr>
+          <th>workflow_run_id</th>
+          <th>workflow_type</th>
+          <th>status</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Workflow Graph</h2>
+    <pre id="workflow-graph"></pre>
+  </section>
+
+  <script>
+    async function loadProject() {
+      const response = await fetch('/api/project');
+      const data = await response.json();
+
+      document.getElementById('project-summary').textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function loadArtifacts() {
+      const response = await fetch('/api/artifacts');
+      const data = await response.json();
+
+      const tbody = document.querySelector('#artifact-table tbody');
+      tbody.innerHTML = '';
+
+      data.artifacts.forEach(artifact => {
+        const row = document.createElement('tr');
+
+        row.innerHTML = `
+          <td>${artifact.artifact_id}</td>
+          <td>${artifact.artifact_type}</td>
+          <td>${artifact.path}</td>
+        `;
+
+        tbody.appendChild(row);
+      });
+    }
+
+    async function loadWorkflowRuns() {
+      const response = await fetch('/api/workflow-runs');
+      const data = await response.json();
+
+      const tbody = document.querySelector('#workflow-table tbody');
+      tbody.innerHTML = '';
+
+      data.workflow_runs.forEach(run => {
+        const row = document.createElement('tr');
+
+        row.innerHTML = `
+          <td>${run.workflow_run_id}</td>
+          <td>${run.workflow_type}</td>
+          <td>${run.status}</td>
+        `;
+
+        tbody.appendChild(row);
+      });
+    }
+
+    async function loadWorkflowGraph() {
+      const response = await fetch('/api/workflow-graph');
+      const data = await response.json();
+
+      document.getElementById('workflow-graph').textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function initialize() {
+      await loadProject();
+      await loadArtifacts();
+      await loadWorkflowRuns();
+      await loadWorkflowGraph();
+    }
+
+    initialize();
+  </script>
+</body>
+</html>

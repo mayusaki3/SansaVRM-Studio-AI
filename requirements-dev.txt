@@ -1,0 +1,6 @@
+-r requirements-core.txt
+
+pytest
+coverage
+mypy
+ruff

@@ -35,7 +35,18 @@ SansaVRM Studio AI は、SansaVRM を中心にした構造化 3D アセット制
 
 ## 現在の状態
 
-現在は PoC / 仕様整理段階。
+現在は architecture stabilization / PoC implementation 段階。
+
+実装済み:
+
+- project workspace
+- artifact registry
+- workflow engine
+- dependency graph
+- local server
+- minimal validation UI
+- copyright risk assessment PoC
+- decomposition schema PoC
 
 詳細は以下を参照。
 
@@ -89,6 +100,13 @@ SansaVRM Studio AI
 │ ├ prompt generation
 │ └ downstream generation support
 │
+├ Workflow System
+│ ├ project workspace
+│ ├ artifact registry
+│ ├ workflow engine
+│ ├ dependency graph
+│ └ provenance
+│
 ├ Adapter
 │ ├ VRM
 │ ├ glTF
@@ -100,6 +118,64 @@ SansaVRM Studio AI
   ├ distribution state
   └ platform export
 ```
+
+## ローカルサーバー
+
+### 推奨 Python
+
+```text
+Python 3.11+
+```
+
+### 必要ライブラリ
+
+```bash
+pip install fastapi uvicorn
+```
+
+### 起動
+
+```bash
+uvicorn src.python.local_server:app --reload
+```
+
+### ブラウザアクセス
+
+```text
+http://127.0.0.1:8000
+```
+
+## API
+
+- GET /api/health
+- GET /api/project
+- GET /api/artifacts
+- GET /api/workflow-runs
+- GET /api/workflow-graph
+
+## 現在の UI
+
+現在の UI は production UI ではない。
+
+architecture validation を目的とした minimal validation UI である。
+
+確認対象:
+
+- project workspace
+- workflow structure
+- artifact registry
+- dependency graph
+
+## 将来予定
+
+- ComfyUI integration
+- Qwen2.5-VL integration
+- SAM2 integration
+- Zero123++ integration
+- distributed execution
+- GPU orchestration
+- provenance graph
+- export pipeline
 
 ## ライセンス
 

@@ -59,6 +59,97 @@ workspace = ProjectWorkspace(
 engine = WorkflowEngine(workspace)
 
 
+def ensure_source_artifact() -> None:
+    """Ensure that the demo source artifact exists."""
+
+    if "artifact-source-image-001" in workspace.artifacts:
+        return
+
+    workspace.register_artifact(
+        Artifact(
+            artifact_id="artifact-source-image-001",
+            artifact_type="source_image",
+            path="artifacts/source/source_001.png",
+        )
+    )
+
+
+def run_demo_workflow(run_index: int | None = None) -> WorkflowRun:
+    """
+    Execute a deterministic demo workflow.
+
+    Args:
+        run_index: Optional run number. If omitted, next index is used.
+
+    Returns:
+        Created workflow run.
+    """
+
+    ensure_source_artifact()
+
+    if run_index is None:
+        run_index = len(workspace.workflow_runs) + 1
+
+    run_suffix = f"{run_index:03d}"
+
+    workflow_run = WorkflowRun(
+        workflow_run_id=f"run-demo-{run_suffix}",
+        workflow_type="ai_preprocess",
+        status="running",
+        local_only=True,
+    )
+
+    risk_step = WorkflowStep(
+        step_id=f"step-risk-{run_suffix}",
+        step_type="copyright_risk_assessment",
+        status="pending",
+        input_artifacts=[
+            "artifact-source-image-001",
+        ],
+    )
+
+    risk_artifact = Artifact(
+        artifact_id=f"artifact-risk-result-{run_suffix}",
+        artifact_type="copyright_risk_result",
+        path=f"artifacts/risk/risk_{run_suffix}.json",
+    )
+
+    engine.execute_step(
+        workflow_run,
+        risk_step,
+        risk_artifact,
+    )
+
+    decomposition_step = WorkflowStep(
+        step_id=f"step-decomposition-{run_suffix}",
+        step_type="decomposition",
+        status="pending",
+        input_artifacts=[
+            "artifact-source-image-001",
+        ],
+    )
+
+    decomposition_artifact = Artifact(
+        artifact_id=f"artifact-decomposition-{run_suffix}",
+        artifact_type="decomposition_result",
+        path=(
+            "artifacts/decomposition/"
+            f"decomposition_{run_suffix}.json"
+        ),
+    )
+
+    engine.execute_step(
+        workflow_run,
+        decomposition_step,
+        decomposition_artifact,
+    )
+
+    workflow_run.status = "completed"
+    workspace.register_workflow_run(workflow_run)
+
+    return workflow_run
+
+
 def seed_demo_data() -> None:
     """
     Seed demo artifacts and workflow graph for UI validation.
@@ -71,65 +162,7 @@ def seed_demo_data() -> None:
     if workspace.artifacts or workspace.workflow_runs:
         return
 
-    source_artifact = Artifact(
-        artifact_id="artifact-source-image-001",
-        artifact_type="source_image",
-        path="artifacts/source/source_001.png",
-    )
-
-    workspace.register_artifact(source_artifact)
-
-    workflow_run = WorkflowRun(
-        workflow_run_id="run-demo-001",
-        workflow_type="ai_preprocess",
-        status="running",
-        local_only=True,
-    )
-
-    risk_step = WorkflowStep(
-        step_id="step-risk-001",
-        step_type="copyright_risk_assessment",
-        status="pending",
-        input_artifacts=[
-            "artifact-source-image-001",
-        ],
-    )
-
-    risk_artifact = Artifact(
-        artifact_id="artifact-risk-result-001",
-        artifact_type="copyright_risk_result",
-        path="artifacts/risk/risk_001.json",
-    )
-
-    engine.execute_step(
-        workflow_run,
-        risk_step,
-        risk_artifact,
-    )
-
-    decomposition_step = WorkflowStep(
-        step_id="step-decomposition-001",
-        step_type="decomposition",
-        status="pending",
-        input_artifacts=[
-            "artifact-source-image-001",
-        ],
-    )
-
-    decomposition_artifact = Artifact(
-        artifact_id="artifact-decomposition-001",
-        artifact_type="decomposition_result",
-        path="artifacts/decomposition/decomposition_001.json",
-    )
-
-    engine.execute_step(
-        workflow_run,
-        decomposition_step,
-        decomposition_artifact,
-    )
-
-    workflow_run.status = "completed"
-    workspace.register_workflow_run(workflow_run)
+    run_demo_workflow(run_index=1)
 
 
 seed_demo_data()
@@ -207,6 +240,18 @@ def workflow_graph():
             k: asdict(v)
             for k, v in engine.dependency_graph.items()
         }
+    }
+
+
+@app.post("/api/workflows/demo/run")
+def run_demo_workflow_endpoint():
+    """Run demo workflow and return created run."""
+
+    workflow_run = run_demo_workflow()
+
+    return {
+        "status": "completed",
+        "workflow_run": asdict(workflow_run),
     }
 
 

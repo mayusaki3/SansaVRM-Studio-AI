@@ -34,6 +34,10 @@
       background: #eee;
     }
 
+    .toolbar {
+      margin-bottom: 20px;
+    }
+
     .status-completed {
       font-weight: bold;
     }
@@ -44,22 +48,30 @@
   </style>
 </head>
 <body>
-  <h1>SansaVRM Studio AI</h1>
-  <p class="muted">Minimal architecture validation UI</p>
+  <div class="toolbar">
+    <label for="language-select">Language:</label>
+    <select id="language-select">
+      <option value="ja">日本語</option>
+      <option value="en">English</option>
+    </select>
+  </div>
+
+  <h1 id="page-title">SansaVRM Studio AI</h1>
+  <p class="muted" id="page-subtitle"></p>
 
   <section>
-    <h2>Project Summary</h2>
+    <h2 id="project-summary-title"></h2>
     <pre id="project-summary"></pre>
   </section>
 
   <section>
-    <h2>Artifacts</h2>
+    <h2 id="artifacts-title"></h2>
     <table id="artifact-table">
       <thead>
         <tr>
-          <th>artifact_id</th>
-          <th>artifact_type</th>
-          <th>path</th>
+          <th id="artifact-id-header"></th>
+          <th id="artifact-type-header"></th>
+          <th id="artifact-path-header"></th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -67,15 +79,15 @@
   </section>
 
   <section>
-    <h2>Workflow Runs</h2>
+    <h2 id="workflow-runs-title"></h2>
     <table id="workflow-table">
       <thead>
         <tr>
-          <th>workflow_run_id</th>
-          <th>workflow_type</th>
-          <th>status</th>
-          <th>local_only</th>
-          <th>steps</th>
+          <th id="workflow-run-id-header"></th>
+          <th id="workflow-type-header"></th>
+          <th id="workflow-status-header"></th>
+          <th id="workflow-local-only-header"></th>
+          <th id="workflow-steps-header"></th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -83,13 +95,13 @@
   </section>
 
   <section>
-    <h2>Artifact Dependency Graph</h2>
+    <h2 id="graph-title"></h2>
     <table id="graph-table">
       <thead>
         <tr>
-          <th>artifact_id</th>
-          <th>created_by_step</th>
-          <th>depends_on</th>
+          <th id="graph-artifact-header"></th>
+          <th id="graph-created-by-header"></th>
+          <th id="graph-depends-on-header"></th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -97,11 +109,89 @@
   </section>
 
   <section>
-    <h2>Raw Workflow Graph</h2>
+    <h2 id="raw-graph-title"></h2>
     <pre id="workflow-graph"></pre>
   </section>
 
   <script>
+    const translations = {
+      ja: {
+        subtitle: '最小アーキテクチャ検証UI',
+        projectSummary: 'Project Summary',
+        artifacts: 'Artifacts',
+        workflowRuns: 'Workflow Runs',
+        dependencyGraph: 'Artifact Dependency Graph',
+        rawGraph: 'Raw Workflow Graph',
+        artifactId: 'artifact_id',
+        artifactType: 'artifact_type',
+        path: 'path',
+        workflowRunId: 'workflow_run_id',
+        workflowType: 'workflow_type',
+        status: 'status',
+        localOnly: 'local_only',
+        steps: 'steps',
+        createdBy: 'created_by_step',
+        dependsOn: 'depends_on'
+      },
+      en: {
+        subtitle: 'Minimal architecture validation UI',
+        projectSummary: 'Project Summary',
+        artifacts: 'Artifacts',
+        workflowRuns: 'Workflow Runs',
+        dependencyGraph: 'Artifact Dependency Graph',
+        rawGraph: 'Raw Workflow Graph',
+        artifactId: 'artifact_id',
+        artifactType: 'artifact_type',
+        path: 'path',
+        workflowRunId: 'workflow_run_id',
+        workflowType: 'workflow_type',
+        status: 'status',
+        localOnly: 'local_only',
+        steps: 'steps',
+        createdBy: 'created_by_step',
+        dependsOn: 'depends_on'
+      }
+    };
+
+    let currentLanguage = localStorage.getItem('svsa_ui_language') || 'ja';
+
+    function t(key) {
+      return translations[currentLanguage]?.[key] || key;
+    }
+
+    function applyTranslations() {
+      document.documentElement.lang = currentLanguage;
+
+      document.getElementById('page-subtitle').textContent = t('subtitle');
+      document.getElementById('project-summary-title').textContent = t('projectSummary');
+      document.getElementById('artifacts-title').textContent = t('artifacts');
+      document.getElementById('workflow-runs-title').textContent = t('workflowRuns');
+      document.getElementById('graph-title').textContent = t('dependencyGraph');
+      document.getElementById('raw-graph-title').textContent = t('rawGraph');
+
+      document.getElementById('artifact-id-header').textContent = t('artifactId');
+      document.getElementById('artifact-type-header').textContent = t('artifactType');
+      document.getElementById('artifact-path-header').textContent = t('path');
+
+      document.getElementById('workflow-run-id-header').textContent = t('workflowRunId');
+      document.getElementById('workflow-type-header').textContent = t('workflowType');
+      document.getElementById('workflow-status-header').textContent = t('status');
+      document.getElementById('workflow-local-only-header').textContent = t('localOnly');
+      document.getElementById('workflow-steps-header').textContent = t('steps');
+
+      document.getElementById('graph-artifact-header').textContent = t('artifactId');
+      document.getElementById('graph-created-by-header').textContent = t('createdBy');
+      document.getElementById('graph-depends-on-header').textContent = t('dependsOn');
+    }
+
+    document.getElementById('language-select').value = currentLanguage;
+
+    document.getElementById('language-select').addEventListener('change', (event) => {
+      currentLanguage = event.target.value;
+      localStorage.setItem('svsa_ui_language', currentLanguage);
+      applyTranslations();
+    });
+
     async function loadProject() {
       const response = await fetch('/api/project');
       const data = await response.json();
@@ -177,6 +267,8 @@
     }
 
     async function initialize() {
+      applyTranslations();
+
       await loadProject();
       await loadArtifacts();
       await loadWorkflowRuns();

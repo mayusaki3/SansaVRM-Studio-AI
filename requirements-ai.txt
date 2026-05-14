@@ -1,0 +1,15 @@
+# Placeholder for future AI runtime integration
+#
+# Planned candidates:
+# - torch
+# - torchvision
+# - diffusers
+# - transformers
+# - accelerate
+# - safetensors
+# - opencv-python
+# - segment-anything
+# - xformers
+#
+# AI runtime dependencies are intentionally separated
+# from the core environment.

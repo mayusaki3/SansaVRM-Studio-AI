@@ -20,7 +20,10 @@ from src.python.project_persistence import (
     validate_project_import,
 )
 from src.python.project_workspace import (
+    Artifact,
     ProjectWorkspace,
+    WorkflowRun,
+    WorkflowStep,
 )
 from src.python.workflow_engine import WorkflowEngine
 
@@ -54,6 +57,82 @@ workspace = ProjectWorkspace(
 )
 
 engine = WorkflowEngine(workspace)
+
+
+def seed_demo_data() -> None:
+    """
+    Seed demo artifacts and workflow graph for UI validation.
+
+    This function is intentionally deterministic so that the initial
+    validation UI always shows a visible Project -> Workflow -> Artifact
+    relationship without requiring AI runtime setup.
+    """
+
+    if workspace.artifacts or workspace.workflow_runs:
+        return
+
+    source_artifact = Artifact(
+        artifact_id="artifact-source-image-001",
+        artifact_type="source_image",
+        path="artifacts/source/source_001.png",
+    )
+
+    workspace.register_artifact(source_artifact)
+
+    workflow_run = WorkflowRun(
+        workflow_run_id="run-demo-001",
+        workflow_type="ai_preprocess",
+        status="running",
+        local_only=True,
+    )
+
+    risk_step = WorkflowStep(
+        step_id="step-risk-001",
+        step_type="copyright_risk_assessment",
+        status="pending",
+        input_artifacts=[
+            "artifact-source-image-001",
+        ],
+    )
+
+    risk_artifact = Artifact(
+        artifact_id="artifact-risk-result-001",
+        artifact_type="copyright_risk_result",
+        path="artifacts/risk/risk_001.json",
+    )
+
+    engine.execute_step(
+        workflow_run,
+        risk_step,
+        risk_artifact,
+    )
+
+    decomposition_step = WorkflowStep(
+        step_id="step-decomposition-001",
+        step_type="decomposition",
+        status="pending",
+        input_artifacts=[
+            "artifact-source-image-001",
+        ],
+    )
+
+    decomposition_artifact = Artifact(
+        artifact_id="artifact-decomposition-001",
+        artifact_type="decomposition_result",
+        path="artifacts/decomposition/decomposition_001.json",
+    )
+
+    engine.execute_step(
+        workflow_run,
+        decomposition_step,
+        decomposition_artifact,
+    )
+
+    workflow_run.status = "completed"
+    workspace.register_workflow_run(workflow_run)
+
+
+seed_demo_data()
 
 
 @app.get("/")

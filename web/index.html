@@ -7,12 +7,14 @@
     body {
       font-family: sans-serif;
       margin: 20px;
+      background: #fafafa;
     }
 
     section {
       margin-bottom: 32px;
       border: 1px solid #ccc;
       padding: 12px;
+      background: #fff;
     }
 
     table {
@@ -23,13 +25,27 @@
     th,
     td {
       border: 1px solid #ccc;
-      padding: 4px;
+      padding: 6px;
       text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #eee;
+    }
+
+    .status-completed {
+      font-weight: bold;
+    }
+
+    .muted {
+      color: #666;
     }
   </style>
 </head>
 <body>
   <h1>SansaVRM Studio AI</h1>
+  <p class="muted">Minimal architecture validation UI</p>
 
   <section>
     <h2>Project Summary</h2>
@@ -58,6 +74,8 @@
           <th>workflow_run_id</th>
           <th>workflow_type</th>
           <th>status</th>
+          <th>local_only</th>
+          <th>steps</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -65,7 +83,21 @@
   </section>
 
   <section>
-    <h2>Workflow Graph</h2>
+    <h2>Artifact Dependency Graph</h2>
+    <table id="graph-table">
+      <thead>
+        <tr>
+          <th>artifact_id</th>
+          <th>created_by_step</th>
+          <th>depends_on</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Raw Workflow Graph</h2>
     <pre id="workflow-graph"></pre>
   </section>
 
@@ -106,11 +138,14 @@
 
       data.workflow_runs.forEach(run => {
         const row = document.createElement('tr');
+        const steps = (run.steps || []).map(step => `${step.step_id} (${step.step_type}: ${step.status})`).join('<br>');
 
         row.innerHTML = `
           <td>${run.workflow_run_id}</td>
           <td>${run.workflow_type}</td>
-          <td>${run.status}</td>
+          <td class="status-${run.status}">${run.status}</td>
+          <td>${run.local_only}</td>
+          <td>${steps}</td>
         `;
 
         tbody.appendChild(row);
@@ -120,6 +155,23 @@
     async function loadWorkflowGraph() {
       const response = await fetch('/api/workflow-graph');
       const data = await response.json();
+
+      const graph = data.dependency_graph || {};
+      const tbody = document.querySelector('#graph-table tbody');
+      tbody.innerHTML = '';
+
+      Object.values(graph).forEach(entry => {
+        const row = document.createElement('tr');
+        const dependsOn = (entry.depends_on || []).join('<br>');
+
+        row.innerHTML = `
+          <td>${entry.artifact_id}</td>
+          <td>${entry.created_by_step}</td>
+          <td>${dependsOn}</td>
+        `;
+
+        tbody.appendChild(row);
+      });
 
       document.getElementById('workflow-graph').textContent = JSON.stringify(data, null, 2);
     }

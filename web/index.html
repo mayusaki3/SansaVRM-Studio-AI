@@ -36,6 +36,14 @@
 
     .toolbar {
       margin-bottom: 20px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    button {
+      padding: 6px 12px;
+      cursor: pointer;
     }
 
     .status-completed {
@@ -54,6 +62,8 @@
       <option value="ja">日本語</option>
       <option value="en">English</option>
     </select>
+
+    <button id="run-demo-workflow-button"></button>
   </div>
 
   <h1 id="page-title">SansaVRM Studio AI</h1>
@@ -122,6 +132,7 @@
         workflowRuns: 'Workflow Runs',
         dependencyGraph: 'Artifact Dependency Graph',
         rawGraph: 'Raw Workflow Graph',
+        runDemoWorkflow: 'Demo Workflow 実行',
         artifactId: 'artifact_id',
         artifactType: 'artifact_type',
         path: 'path',
@@ -140,6 +151,7 @@
         workflowRuns: 'Workflow Runs',
         dependencyGraph: 'Artifact Dependency Graph',
         rawGraph: 'Raw Workflow Graph',
+        runDemoWorkflow: 'Run Demo Workflow',
         artifactId: 'artifact_id',
         artifactType: 'artifact_type',
         path: 'path',
@@ -168,6 +180,7 @@
       document.getElementById('workflow-runs-title').textContent = t('workflowRuns');
       document.getElementById('graph-title').textContent = t('dependencyGraph');
       document.getElementById('raw-graph-title').textContent = t('rawGraph');
+      document.getElementById('run-demo-workflow-button').textContent = t('runDemoWorkflow');
 
       document.getElementById('artifact-id-header').textContent = t('artifactId');
       document.getElementById('artifact-type-header').textContent = t('artifactType');
@@ -190,6 +203,19 @@
       currentLanguage = event.target.value;
       localStorage.setItem('svsa_ui_language', currentLanguage);
       applyTranslations();
+    });
+
+    document.getElementById('run-demo-workflow-button').addEventListener('click', async () => {
+      const response = await fetch('/api/workflows/demo/run', {
+        method: 'POST'
+      });
+
+      if (!response.ok) {
+        alert('Workflow execution failed');
+        return;
+      }
+
+      await refreshAll();
     });
 
     async function loadProject() {
@@ -266,13 +292,16 @@
       document.getElementById('workflow-graph').textContent = JSON.stringify(data, null, 2);
     }
 
-    async function initialize() {
-      applyTranslations();
-
+    async function refreshAll() {
       await loadProject();
       await loadArtifacts();
       await loadWorkflowRuns();
       await loadWorkflowGraph();
+    }
+
+    async function initialize() {
+      applyTranslations();
+      await refreshAll();
     }
 
     initialize();

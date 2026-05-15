@@ -59,6 +59,30 @@ engine = WorkflowEngine(workspace)
 
 governance_diagnostics: list[dict] = []
 
+component_registry = [
+    {
+        "component_id": "body-001",
+        "component_type": "body",
+        "source_sansavrm": "SansaVRM_A",
+        "assembly_allowed": True,
+        "reason": "allowed",
+    },
+    {
+        "component_id": "hair-001",
+        "component_type": "hair",
+        "source_sansavrm": "SansaVRM_B",
+        "assembly_allowed": False,
+        "reason": "assembly_denied_by_policy",
+    },
+    {
+        "component_id": "clothing-001",
+        "component_type": "clothing",
+        "source_sansavrm": "SansaVRM_C",
+        "assembly_allowed": True,
+        "reason": "allowed",
+    },
+]
+
 
 def ensure_source_artifact() -> None:
     if "artifact-source-image-001" in workspace.artifacts:
@@ -207,6 +231,13 @@ def project_summary():
         "schema_version": workspace.schema_version,
         "artifact_count": len(workspace.artifacts),
         "workflow_run_count": len(workspace.workflow_runs),
+    }
+
+
+@app.get("/api/components")
+def components():
+    return {
+        "components": component_registry,
     }
 
 

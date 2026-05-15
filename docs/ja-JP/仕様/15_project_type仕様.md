@@ -24,6 +24,7 @@ SansaVRM Studio AI は単一 workflow を扱うツールではない。
 
 - 画像/プロンプトから SansaVRM を生成する。
 - SansaVRM を他形式へ変換する。
+- 他形式から SansaVRM へ変換する。
 - 複数 SansaVRM を合成する。
 - policy / restriction を編集する。
 - export 用 package を作成する。
@@ -50,12 +51,37 @@ project_type は、project の役割と workflow 構成を定義する識別子�
 
 目的:
 
+SansaVRM と外部形式の双方向変換を扱う。
+
+入力候補:
+
+- SansaVRM
+- VRM
+- glTF / GLB
+- FBX
+- MMD
+- その他 adapter が対応する形式
+
+出力候補:
+
+- SansaVRM
+- VRM
+- glTF / GLB
+- FBX
+- MMD
+- その他 adapter が対応する形式
+
+主な処理:
+
 - SansaVRM import
-- VRM export
-- glTF export
-- FBX export
-- MMD export
+- external format import
+- SansaVRM export
+- external format export
 - compatibility validation
+- conversion diagnostics
+- loss report
+- preserve_only / unsupported / source_raw handling
+- policy / restriction preservation
 
 ### 4.3 sansavrm_outfit_composition
 
@@ -78,6 +104,7 @@ registry は以下を定義する。
 - display name
 - required asset types
 - workflow templates
+- supported import types
 - supported export types
 - workspace UI definition
 - policy handlers
@@ -95,6 +122,16 @@ image_prompt_to_sansavrm
  ├ copyright risk assessment
  ├ multi-view generation
  └ SansaVRM generation
+```
+
+```text
+sansavrm_conversion
+ ├ source import
+ ├ compatibility validation
+ ├ conversion mapping
+ ├ conversion execution
+ ├ diagnostics / loss report
+ └ target export
 ```
 
 ## 7. UI 構造
@@ -127,6 +164,7 @@ project schema は project_type を必須項目として持つ。
 - project_type 未定義の project を保存してはならない。
 - project_type と無関係な workflow template を自動追加してはならない。
 - project_type を workflow 実行中に変更してはならない。
+- sansavrm_conversion で変換方向を記録せずに conversion workflow を実行してはならない。
 
 ## 10. 次アクション
 
@@ -134,6 +172,7 @@ project schema は project_type を必須項目として持つ。
 - project_type registry 実装を追加する。
 - Project Viewer UI を作成する。
 - project_type 別 Workspace UI を整理する。
+- sansavrm_conversion の conversion direction schema を定義する。
 
 ---
 

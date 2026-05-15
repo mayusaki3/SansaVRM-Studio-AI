@@ -39,6 +39,7 @@
       display: flex;
       gap: 12px;
       align-items: center;
+      flex-wrap: wrap;
     }
 
     button {
@@ -47,6 +48,16 @@
     }
 
     .status-completed {
+      font-weight: bold;
+    }
+
+    .status-failed {
+      color: red;
+      font-weight: bold;
+    }
+
+    .diagnostic-denied {
+      color: red;
       font-weight: bold;
     }
 
@@ -64,6 +75,7 @@
     </select>
 
     <button id="run-demo-workflow-button"></button>
+    <button id="run-denied-workflow-button"></button>
   </div>
 
   <h1 id="page-title">SansaVRM Studio AI</h1>
@@ -72,6 +84,22 @@
   <section>
     <h2 id="project-summary-title"></h2>
     <pre id="project-summary"></pre>
+  </section>
+
+  <section>
+    <h2 id="governance-diagnostics-title"></h2>
+    <table id="governance-table">
+      <thead>
+        <tr>
+          <th>workflow_run_id</th>
+          <th>step_id</th>
+          <th>operation</th>
+          <th>allowed</th>
+          <th>reason</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </section>
 
   <section>
@@ -118,21 +146,17 @@
     </table>
   </section>
 
-  <section>
-    <h2 id="raw-graph-title"></h2>
-    <pre id="workflow-graph"></pre>
-  </section>
-
   <script>
     const translations = {
       ja: {
-        subtitle: '最小アーキテクチャ検証UI',
+        subtitle: 'Governance-aware validation UI',
         projectSummary: 'Project Summary',
+        governanceDiagnostics: 'Governance Diagnostics',
         artifacts: 'Artifacts',
         workflowRuns: 'Workflow Runs',
         dependencyGraph: 'Artifact Dependency Graph',
-        rawGraph: 'Raw Workflow Graph',
         runDemoWorkflow: 'Demo Workflow 実行',
+        runDeniedWorkflow: 'Denied Workflow 実行',
         artifactId: 'artifact_id',
         artifactType: 'artifact_type',
         path: 'path',
@@ -145,13 +169,14 @@
         dependsOn: 'depends_on'
       },
       en: {
-        subtitle: 'Minimal architecture validation UI',
+        subtitle: 'Governance-aware validation UI',
         projectSummary: 'Project Summary',
+        governanceDiagnostics: 'Governance Diagnostics',
         artifacts: 'Artifacts',
         workflowRuns: 'Workflow Runs',
         dependencyGraph: 'Artifact Dependency Graph',
-        rawGraph: 'Raw Workflow Graph',
         runDemoWorkflow: 'Run Demo Workflow',
+        runDeniedWorkflow: 'Run Denied Workflow',
         artifactId: 'artifact_id',
         artifactType: 'artifact_type',
         path: 'path',
@@ -176,11 +201,12 @@
 
       document.getElementById('page-subtitle').textContent = t('subtitle');
       document.getElementById('project-summary-title').textContent = t('projectSummary');
+      document.getElementById('governance-diagnostics-title').textContent = t('governanceDiagnostics');
       document.getElementById('artifacts-title').textContent = t('artifacts');
       document.getElementById('workflow-runs-title').textContent = t('workflowRuns');
       document.getElementById('graph-title').textContent = t('dependencyGraph');
-      document.getElementById('raw-graph-title').textContent = t('rawGraph');
       document.getElementById('run-demo-workflow-button').textContent = t('runDemoWorkflow');
+      document.getElementById('run-denied-workflow-button').textContent = t('runDeniedWorkflow');
 
       document.getElementById('artifact-id-header').textContent = t('artifactId');
       document.getElementById('artifact-type-header').textContent = t('artifactType');
@@ -206,14 +232,17 @@
     });
 
     document.getElementById('run-demo-workflow-button').addEventListener('click', async () => {
-      const response = await fetch('/api/workflows/demo/run', {
+      await fetch('/api/workflows/demo/run', {
         method: 'POST'
       });
 
-      if (!response.ok) {
-        alert('Workflow execution failed');
-        return;
-      }
+      await refreshAll();
+    });
+
+    document.getElementById('run-denied-workflow-button').addEventListener('click', async () => {
+      await fetch('/api/workflows/demo/run?deny_decomposition=true', {
+        method: 'POST'
+      });
 
       await refreshAll();
     });
@@ -223,6 +252,28 @@
       const data = await response.json();
 
       document.getElementById('project-summary').textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function loadGovernanceDiagnostics() {
+      const response = await fetch('/api/governance-diagnostics');
+      const data = await response.json();
+
+      const tbody = document.querySelector('#governance-table tbody');
+      tbody.innerHTML = '';
+
+      data.diagnostics.forEach(diag => {
+        const row = document.createElement('tr');
+
+        row.innerHTML = `
+          <td>${diag.workflow_run_id}</td>
+          <td>${diag.step_id}</td>
+          <td>${diag.operation}</td>
+          <td class="diagnostic-denied">${diag.allowed}</td>
+          <td>${diag.reason}</td>
+        `;
+
+        tbody.appendChild(row);
+      });
     }
 
     async function loadArtifacts() {
@@ -288,12 +339,11 @@
 
         tbody.appendChild(row);
       });
-
-      document.getElementById('workflow-graph').textContent = JSON.stringify(data, null, 2);
     }
 
     async function refreshAll() {
       await loadProject();
+      await loadGovernanceDiagnostics();
       await loadArtifacts();
       await loadWorkflowRuns();
       await loadWorkflowGraph();

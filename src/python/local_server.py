@@ -13,6 +13,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from src.python.governance_evaluator import (
+    GovernanceRule,
+    GovernanceTarget,
+)
 from src.python.project_persistence import (
     PersistenceError,
     export_project_package,
@@ -22,6 +26,7 @@ from src.python.project_persistence import (
 from src.python.project_workspace import (
     Artifact,
     ProjectWorkspace,
+    ValidationError,
     WorkflowRun,
     WorkflowStep,
 )
@@ -29,21 +34,15 @@ from src.python.workflow_engine import WorkflowEngine
 
 
 class SaveProjectRequest(BaseModel):
-    """Request body for saving project workspace."""
-
     root_path: str
 
 
 class ExportProjectRequest(BaseModel):
-    """Request body for exporting project package."""
-
     root_path: str
     output_zip_path: str
 
 
 class ValidateProjectRequest(BaseModel):
-    """Request body for validating imported project."""
-
     root_path: str
 
 
@@ -58,10 +57,10 @@ workspace = ProjectWorkspace(
 
 engine = WorkflowEngine(workspace)
 
+governance_diagnostics: list[dict] = []
+
 
 def ensure_source_artifact() -> None:
-    """Ensure that the demo source artifact exists."""
-
     if "artifact-source-image-001" in workspace.artifacts:
         return
 
@@ -74,16 +73,11 @@ def ensure_source_artifact() -> None:
     )
 
 
-def run_demo_workflow(run_index: int | None = None) -> WorkflowRun:
-    """
-    Execute a deterministic demo workflow.
-
-    Args:
-        run_index: Optional run number. If omitted, next index is used.
-
-    Returns:
-        Created workflow run.
-    """
+def run_demo_workflow(
+    run_index: int | None = None,
+    deny_decomposition: bool = False,
+) -> WorkflowRun:
+    """Execute deterministic demo workflow."""
 
     ensure_source_artifact()
 
@@ -103,9 +97,7 @@ def run_demo_workflow(run_index: int | None = None) -> WorkflowRun:
         step_id=f"step-risk-{run_suffix}",
         step_type="copyright_risk_assessment",
         status="pending",
-        input_artifacts=[
-            "artifact-source-image-001",
-        ],
+        input_artifacts=["artifact-source-image-001"],
     )
 
     risk_artifact = Artifact(
@@ -124,25 +116,54 @@ def run_demo_workflow(run_index: int | None = None) -> WorkflowRun:
         step_id=f"step-decomposition-{run_suffix}",
         step_type="decomposition",
         status="pending",
-        input_artifacts=[
-            "artifact-source-image-001",
-        ],
+        input_artifacts=["artifact-source-image-001"],
     )
 
     decomposition_artifact = Artifact(
         artifact_id=f"artifact-decomposition-{run_suffix}",
         artifact_type="decomposition_result",
-        path=(
-            "artifacts/decomposition/"
-            f"decomposition_{run_suffix}.json"
-        ),
+        path=f"artifacts/decomposition/decomposition_{run_suffix}.json",
     )
 
-    engine.execute_step(
-        workflow_run,
-        decomposition_step,
-        decomposition_artifact,
+    governance_target = GovernanceTarget(
+        target_id="artifact-source-image-001",
+        target_type="asset",
+        rules=[],
     )
+
+    if deny_decomposition:
+        governance_target.rules.append(
+            GovernanceRule(
+                operation="decompose",
+                allowed=False,
+                reason="decomposition_denied_by_policy",
+            )
+        )
+
+    try:
+        engine.execute_step(
+            workflow_run,
+            decomposition_step,
+            decomposition_artifact,
+            governance_operation="decompose",
+            governance_target=governance_target,
+        )
+    except ValidationError as exc:
+        workflow_run.status = "failed"
+
+        governance_diagnostics.append(
+            {
+                "workflow_run_id": workflow_run.workflow_run_id,
+                "step_id": decomposition_step.step_id,
+                "operation": "decompose",
+                "allowed": False,
+                "reason": str(exc),
+            }
+        )
+
+        workspace.register_workflow_run(workflow_run)
+
+        return workflow_run
 
     workflow_run.status = "completed"
     workspace.register_workflow_run(workflow_run)
@@ -151,14 +172,6 @@ def run_demo_workflow(run_index: int | None = None) -> WorkflowRun:
 
 
 def seed_demo_data() -> None:
-    """
-    Seed demo artifacts and workflow graph for UI validation.
-
-    This function is intentionally deterministic so that the initial
-    validation UI always shows a visible Project -> Workflow -> Artifact
-    relationship without requiring AI runtime setup.
-    """
-
     if workspace.artifacts or workspace.workflow_runs:
         return
 
@@ -170,8 +183,6 @@ seed_demo_data()
 
 @app.get("/")
 def index():
-    """Serve minimal validation UI."""
-
     index_path = Path("web") / "index.html"
 
     if not index_path.exists():
@@ -185,56 +196,36 @@ def index():
 
 @app.get("/api/health")
 def health():
-    """Health check endpoint."""
-
-    return {
-        "status": "ok"
-    }
+    return {"status": "ok"}
 
 
 @app.get("/api/project")
 def project_summary():
-    """Project summary endpoint."""
-
     return {
         "project_id": workspace.project_id,
         "project_name": workspace.project_name,
         "schema_version": workspace.schema_version,
         "artifact_count": len(workspace.artifacts),
-        "workflow_run_count": len(
-            workspace.workflow_runs
-        ),
+        "workflow_run_count": len(workspace.workflow_runs),
     }
 
 
 @app.get("/api/artifacts")
 def artifacts():
-    """Artifact registry endpoint."""
-
     return {
-        "artifacts": [
-            asdict(a)
-            for a in workspace.artifacts.values()
-        ]
+        "artifacts": [asdict(a) for a in workspace.artifacts.values()]
     }
 
 
 @app.get("/api/workflow-runs")
 def workflow_runs():
-    """Workflow run endpoint."""
-
     return {
-        "workflow_runs": [
-            asdict(r)
-            for r in workspace.workflow_runs.values()
-        ]
+        "workflow_runs": [asdict(r) for r in workspace.workflow_runs.values()]
     }
 
 
 @app.get("/api/workflow-graph")
 def workflow_graph():
-    """Workflow dependency graph endpoint."""
-
     return {
         "dependency_graph": {
             k: asdict(v)
@@ -243,22 +234,29 @@ def workflow_graph():
     }
 
 
-@app.post("/api/workflows/demo/run")
-def run_demo_workflow_endpoint():
-    """Run demo workflow and return created run."""
+@app.get("/api/governance-diagnostics")
+def governance_diagnostics_endpoint():
+    return {
+        "diagnostics": governance_diagnostics,
+    }
 
-    workflow_run = run_demo_workflow()
+
+@app.post("/api/workflows/demo/run")
+def run_demo_workflow_endpoint(
+    deny_decomposition: bool = False,
+):
+    workflow_run = run_demo_workflow(
+        deny_decomposition=deny_decomposition,
+    )
 
     return {
-        "status": "completed",
+        "status": workflow_run.status,
         "workflow_run": asdict(workflow_run),
     }
 
 
 @app.post("/api/project/save")
 def save_current_project(request: SaveProjectRequest):
-    """Save current project workspace."""
-
     save_project(workspace, request.root_path)
 
     return {
@@ -269,8 +267,6 @@ def save_current_project(request: SaveProjectRequest):
 
 @app.post("/api/project/export")
 def export_current_project(request: ExportProjectRequest):
-    """Export current project package."""
-
     save_project(workspace, request.root_path)
     export_project_package(
         request.root_path,
@@ -285,8 +281,6 @@ def export_current_project(request: ExportProjectRequest):
 
 @app.post("/api/project/validate-import")
 def validate_imported_project(request: ValidateProjectRequest):
-    """Validate imported project path."""
-
     try:
         validate_project_import(request.root_path)
     except PersistenceError as exc:

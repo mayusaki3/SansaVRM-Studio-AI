@@ -51,13 +51,15 @@
       font-weight: bold;
     }
 
-    .status-failed {
+    .status-failed,
+    .diagnostic-denied,
+    .component-denied {
       color: red;
       font-weight: bold;
     }
 
-    .diagnostic-denied {
-      color: red;
+    .component-allowed {
+      color: green;
       font-weight: bold;
     }
 
@@ -84,6 +86,22 @@
   <section>
     <h2 id="project-summary-title"></h2>
     <pre id="project-summary"></pre>
+  </section>
+
+  <section>
+    <h2 id="component-governance-title">Component Governance</h2>
+    <table id="component-table">
+      <thead>
+        <tr>
+          <th>component_id</th>
+          <th>component_type</th>
+          <th>source_sansavrm</th>
+          <th>assembly_allowed</th>
+          <th>reason</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </section>
 
   <section>
@@ -147,111 +165,37 @@
   </section>
 
   <script>
-    const translations = {
-      ja: {
-        subtitle: 'Governance-aware validation UI',
-        projectSummary: 'Project Summary',
-        governanceDiagnostics: 'Governance Diagnostics',
-        artifacts: 'Artifacts',
-        workflowRuns: 'Workflow Runs',
-        dependencyGraph: 'Artifact Dependency Graph',
-        runDemoWorkflow: 'Demo Workflow 実行',
-        runDeniedWorkflow: 'Denied Workflow 実行',
-        artifactId: 'artifact_id',
-        artifactType: 'artifact_type',
-        path: 'path',
-        workflowRunId: 'workflow_run_id',
-        workflowType: 'workflow_type',
-        status: 'status',
-        localOnly: 'local_only',
-        steps: 'steps',
-        createdBy: 'created_by_step',
-        dependsOn: 'depends_on'
-      },
-      en: {
-        subtitle: 'Governance-aware validation UI',
-        projectSummary: 'Project Summary',
-        governanceDiagnostics: 'Governance Diagnostics',
-        artifacts: 'Artifacts',
-        workflowRuns: 'Workflow Runs',
-        dependencyGraph: 'Artifact Dependency Graph',
-        runDemoWorkflow: 'Run Demo Workflow',
-        runDeniedWorkflow: 'Run Denied Workflow',
-        artifactId: 'artifact_id',
-        artifactType: 'artifact_type',
-        path: 'path',
-        workflowRunId: 'workflow_run_id',
-        workflowType: 'workflow_type',
-        status: 'status',
-        localOnly: 'local_only',
-        steps: 'steps',
-        createdBy: 'created_by_step',
-        dependsOn: 'depends_on'
-      }
-    };
-
-    let currentLanguage = localStorage.getItem('svsa_ui_language') || 'ja';
-
-    function t(key) {
-      return translations[currentLanguage]?.[key] || key;
-    }
-
-    function applyTranslations() {
-      document.documentElement.lang = currentLanguage;
-
-      document.getElementById('page-subtitle').textContent = t('subtitle');
-      document.getElementById('project-summary-title').textContent = t('projectSummary');
-      document.getElementById('governance-diagnostics-title').textContent = t('governanceDiagnostics');
-      document.getElementById('artifacts-title').textContent = t('artifacts');
-      document.getElementById('workflow-runs-title').textContent = t('workflowRuns');
-      document.getElementById('graph-title').textContent = t('dependencyGraph');
-      document.getElementById('run-demo-workflow-button').textContent = t('runDemoWorkflow');
-      document.getElementById('run-denied-workflow-button').textContent = t('runDeniedWorkflow');
-
-      document.getElementById('artifact-id-header').textContent = t('artifactId');
-      document.getElementById('artifact-type-header').textContent = t('artifactType');
-      document.getElementById('artifact-path-header').textContent = t('path');
-
-      document.getElementById('workflow-run-id-header').textContent = t('workflowRunId');
-      document.getElementById('workflow-type-header').textContent = t('workflowType');
-      document.getElementById('workflow-status-header').textContent = t('status');
-      document.getElementById('workflow-local-only-header').textContent = t('localOnly');
-      document.getElementById('workflow-steps-header').textContent = t('steps');
-
-      document.getElementById('graph-artifact-header').textContent = t('artifactId');
-      document.getElementById('graph-created-by-header').textContent = t('createdBy');
-      document.getElementById('graph-depends-on-header').textContent = t('dependsOn');
-    }
-
-    document.getElementById('language-select').value = currentLanguage;
-
-    document.getElementById('language-select').addEventListener('change', (event) => {
-      currentLanguage = event.target.value;
-      localStorage.setItem('svsa_ui_language', currentLanguage);
-      applyTranslations();
-    });
-
-    document.getElementById('run-demo-workflow-button').addEventListener('click', async () => {
-      await fetch('/api/workflows/demo/run', {
-        method: 'POST'
-      });
-
-      await refreshAll();
-    });
-
-    document.getElementById('run-denied-workflow-button').addEventListener('click', async () => {
-      await fetch('/api/workflows/demo/run?deny_decomposition=true', {
-        method: 'POST'
-      });
-
-      await refreshAll();
-    });
-
     async function loadProject() {
       const response = await fetch('/api/project');
       const data = await response.json();
 
       document.getElementById('project-summary').textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function loadComponents() {
+      const response = await fetch('/api/components');
+      const data = await response.json();
+
+      const tbody = document.querySelector('#component-table tbody');
+      tbody.innerHTML = '';
+
+      data.components.forEach(component => {
+        const row = document.createElement('tr');
+
+        const allowedClass = component.assembly_allowed
+          ? 'component-allowed'
+          : 'component-denied';
+
+        row.innerHTML = `
+          <td>${component.component_id}</td>
+          <td>${component.component_type}</td>
+          <td>${component.source_sansavrm}</td>
+          <td class="${allowedClass}">${component.assembly_allowed}</td>
+          <td>${component.reason}</td>
+        `;
+
+        tbody.appendChild(row);
+      });
     }
 
     async function loadGovernanceDiagnostics() {
@@ -343,18 +287,33 @@
 
     async function refreshAll() {
       await loadProject();
+      await loadComponents();
       await loadGovernanceDiagnostics();
       await loadArtifacts();
       await loadWorkflowRuns();
       await loadWorkflowGraph();
     }
 
-    async function initialize() {
-      applyTranslations();
-      await refreshAll();
-    }
+    document.getElementById('run-demo-workflow-button').textContent = 'Demo Workflow 実行';
+    document.getElementById('run-denied-workflow-button').textContent = 'Denied Workflow 実行';
 
-    initialize();
+    document.getElementById('run-demo-workflow-button').addEventListener('click', async () => {
+      await fetch('/api/workflows/demo/run', {
+        method: 'POST'
+      });
+
+      await refreshAll();
+    });
+
+    document.getElementById('run-denied-workflow-button').addEventListener('click', async () => {
+      await fetch('/api/workflows/demo/run?deny_decomposition=true', {
+        method: 'POST'
+      });
+
+      await refreshAll();
+    });
+
+    refreshAll();
   </script>
 </body>
 </html>
